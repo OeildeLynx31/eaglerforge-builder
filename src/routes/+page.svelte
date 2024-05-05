@@ -5,6 +5,8 @@
     import NavigationBar from "$lib/NavigationBar/NavigationBar.svelte";
     import NavigationDivider from "$lib/NavigationBar/Divider.svelte";
     import NavigationButton from "$lib/NavigationBar/Button.svelte";
+    import RightNavigationButton from "$lib/NavigationBar/ButtonRight.svelte";
+    import ShareButton from "$lib/NavigationBar/ShareButton.svelte"
     import StyledButton from "$lib/StyledComponents/ToolboxButton.svelte";
     import ControlBar from "$lib/ControlBar/ControlBar.svelte";
     import StartButton from "$lib/ControlBar/StartButton.svelte";
@@ -17,6 +19,8 @@
     // Modals
     import ExtensionColorsModal from "$lib/MenuModals/ExtensionColors.svelte";
     import CreateBlockModal from "$lib/MenuModals/CreateBlock.svelte";
+    import ShareModModal from "$lib/MenuModals/ShareMod.svelte";
+    import ShareModLinkModal from "$lib/MenuModals/ShareModLink.svelte";
 
     // Modal Scripts
     import CreateBlockModalScript from "$lib/MenuModals/createblock.js";
@@ -195,6 +199,7 @@
     }
 
     import pkg from '@blockly/workspace-minimap';
+    
     const { PositionedMinimap } = pkg;
     onMount(() => {
         console.log("ignore the warnings above we dont care about those");
@@ -372,6 +377,8 @@
     // Modals
     const ModalState = {
         extensionColors: false,
+        shareLink: false,
+        share: false,
     };
 
     function discordInvite() {
@@ -473,6 +480,43 @@
     function setFullscreenIcon() {
         document.getElementById('fullscreenButton').innerHTML = `<i class="${(location.hash === ""?"fa fa-expand":"fa fa-compress")}"></i>`;
     }
+
+    function openPopupPermalink() {
+        ModalState.share = true;
+    }
+
+    function sendLinkRequest(data) {
+        if (data.type === "instance") {
+            let modLink = btoa(lastGeneratedCode);
+            const url = 'https://spoo.me/';
+            const dataPOST = new URLSearchParams();
+            dataPOST.append('url', `${window.location.origin}/eaglerforge/${data.version}/?Mod=${encodeURIComponent("data:text/plain;charset=utf-8;base64,") + modLink}`); //`${window.location.origin}/eaglerforge/${data.version}/?Mod=data:text/plain;charset=utf-8;base64,${modLink}`
+            dataPOST.append('alias', data.title);
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+            xhr.setRequestHeader('Accept', 'application/json');
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200) {
+                        askOpenShareLink(JSON.parse(xhr.responseText).short_url);
+                    } else {
+                        console.error(`HTTP error! Status: ${xhr.status}`);
+                    }
+                }
+            };
+
+            xhr.send(dataPOST);
+        } else if (data.type === "mod") {
+            askOpenShareLink("data:text/plain;charset=utf-8," + encodeURIComponent(lastGeneratedCode));
+        }
+    }
+
+    function askOpenShareLink(link) {
+            sessionStorage.setItem('lastSharedLink', link);
+            ModalState.shareLink = true;
+        }
 </script>
 
 <CreateBlockModal
@@ -500,14 +544,35 @@
         }}
     />
 {/if}
+{#if ModalState.share}
+    <ShareModModal
+    tbShow={extensionMetadata.tbShow}
+    on:completed={(data) => {
+        sendLinkRequest(data.detail);
+        ModalState.share = false;
+    }}
+    on:cancel={(data) => {
+        ModalState.share = false;
+        if (data.detail.openLastLink === true) {
+            askOpenShareLink(sessionStorage.getItem('lastSharedLink'))
+        }
+    }}/>
+{/if}
+{#if ModalState.shareLink}
+    <ShareModLinkModal
+        tbShow={extensionMetadata.tbShow}
+        on:completed={(data) => {
+            ModalState.shareLink = false;
+        }}/>
+{/if}
 <NavigationBar>
     <NavigationButton on:click={discordInvite}>Discord</NavigationButton>
     <NavigationButton on:click={github}>Github</NavigationButton>
     <NavigationDivider />
     <NavigationButton on:click={downloadProject}>Save</NavigationButton>
-    <NavigationButton on:click={loadProject}>Load</NavigationButton><!--
+    <NavigationButton on:click={loadProject}>Load</NavigationButton>
     <NavigationDivider />
-    <input
+<!--<input
         class="project-name"
         type="text"
         placeholder="Extension ID (ex: extensionID)"
@@ -521,15 +586,16 @@
             <b>Extension ID must be only letters and numbers.</b>
         </p>
     {/if}
-    <NavigationDivider />
+    <NavigationDivider />-->
     <input
         class="project-name"
         type="text"
-        placeholder="Extension Name (ex: Extension)"
+        placeholder="Mod Name (ex: My Mod)"
         style="margin-left:4px;margin-right:4px"
         bind:value={projectName}
         on:change={updateGeneratedCode}
-    />-->
+    />
+    <ShareButton on:click={openPopupPermalink}>Share</ShareButton>
 </NavigationBar>
 <div class="main">
     <div class="row-menus">
@@ -630,13 +696,13 @@
         background: #111;
     }
 
-    :global(body.dark) input[type="text"],
+    :global(body.dark) input[type="text"]:not(.project-name),
     :global(body.dark) input[type="number"] {
         background: transparent;
         border: 1px solid rgba(255, 255, 255, 0.7);
         color: white;
     }
-    :global(body.dark) input[type="text"]:hover,
+    :global(body.dark) input[type="text"]:not(.project-name):hover,
     :global(body.dark) input[type="number"]:hover {
         background: transparent;
         border: 1px solid dodgerblue;
@@ -668,20 +734,22 @@
         padding: 0.5rem;
         transition: 0.25s;
     }
+
     .project-name::placeholder {
         font-weight: normal;
-        color: white;
+        color: rgba(255, 255, 255, 0.75);
         opacity: 1;
-        font-style: italic;
     }
+
     .project-name:hover {
         background-color: hsla(0, 100%, 100%, 0.5);
         transition: 0.25s;
     }
+
     .project-name:active,
     .project-name:focus {
         outline: none;
-        border: 1px solid hsla(0, 100%, 100%, 0);
+        border: 0px;
         box-shadow: 0 0 0 calc(0.5rem * 0.5) hsla(0, 100%, 100%, 0.25);
         background-color: hsla(0, 100%, 100%, 1);
         color: black;
@@ -695,6 +763,29 @@
     :global(body.dark) .project-name[data-invalid="true"] {
         background-color: #9b0000 !important;
         text-decoration: red underline;
+    }
+
+    :global(body.dark) .project-name {
+        outline: 1px dashed black;
+        background: #4b4b4b;
+        border: 0px;
+        color: #fff;
+    }
+
+    :global(body.dark) .project-name:hover {
+        outline: 1px dashed rgb(39, 39, 39);
+        background: #616161;
+        color: #fff;
+    }
+
+    :global(body.dark) .project-name:focus {
+        outline: 1px dashed black;
+        background: #eee;
+        color: black;
+    }
+
+    :global(body.dark) .project-name:focus::placeholder {
+        color: #eee;
     }
 
     .extensionIcon {
