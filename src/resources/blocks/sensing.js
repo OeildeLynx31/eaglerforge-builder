@@ -208,10 +208,14 @@ const keyBoard = [
     ["F12", "123"],
 ];
 
+try {
 Blockly.Extensions.register('single_character_validation', function() {
     this.getField('KEY').setValidator(function(newValue) {
         return newValue.substring(Math.max(newValue.length - 1, 0),newValue.length);
     });
 });
+} catch {
+    console.log("Reload")
+}
 
 export default register;

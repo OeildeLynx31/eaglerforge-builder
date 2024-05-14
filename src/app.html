@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
-		<title>EaglerForge Builder - Make mods with blocks</title>
+		<title>EaglerBuilder - Make mods with blocks</title>
     	<meta name="description" content="Create EaglerForge mods using Scratch-like block coding." />
     	<meta name="keywords" content="EaglerForge, Eaglercraft, blocks, EaglerForge mod, Minecraft" />
     	<meta name="author" content="Oeildelynx" />
@@ -12,7 +12,7 @@
 		<meta name="viewport" content="width=device-width" />
 		<style id="XTI0GZwZotMzDMi0wcGctLFttIWctMdtLPXI9M0aGGDQyMHRpMViW3E="></style>
 		<style>
-			*:not(code, .token) {
+			*:not(code, textarea, .token) {
 				font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 			}
 			body {
@@ -24,13 +24,15 @@
 			}
 
 			a {
-				color: #ff4b4b;
+				color: rgb(86, 114, 205);
+        		text-decoration: none;
 			}
 			a:hover {
-				color: #ff7373;
+				color: rgb(126, 154, 245);
+        		text-decoration: underline;
 			}
 			a:active {
-				color: #a52b2b;
+				color: rgb(54, 82, 173);
 			}
 
 			/* blockly overrides */
@@ -114,7 +116,7 @@
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div class="__alert_prompt" id="Zm5BSEgzQW5HeW9yZkFkNEhpbGJiamtpZmdoOGNDc2lMR29JSzF0K2JnPT0=">
-			<p style="margin-block: 0;">EaglerForge Builder is currently in development, some project files may break due to code changing all the time.</p>
+			<p style="margin-block: 0;">EaglerBuilder is currently in development, some project files may break due to code changing all the time.</p>
 			<button
 				style="margin: 0; margin-left: 8px; background: transparent; border: 0; outline: 0; padding: 0; cursor: pointer;"
 				onclick="closeAlert()"
