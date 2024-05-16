@@ -1,0 +1,2 @@
+<h1>EaglerBuilder Documentation</h1>
+<p><a href="/" target=_blank>EaglerBuilder</a> is a website made by <a href="https://discord.com/users/864214504941158441" target=_blank>@oeildelynx31</a> to create <a href="https://eaglerforge.github.io/" target=_blank>EaglerForge</a> Mods using Scratch-Like block coding. This is the place where its documentation is.</p>

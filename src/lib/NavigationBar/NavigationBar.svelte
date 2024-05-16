@@ -1,6 +1,7 @@
 <script>
     // Components
     import Divider from "$lib/NavigationBar/Divider.svelte";
+    import Button from "$lib/NavigationBar/Button.svelte";
 
     const switchTheme = () => {
         const id = "tb:theme";
@@ -16,6 +17,10 @@
             currentData === "dark" ? "light" : "dark"
         );
     };
+
+    function link(link) {
+        window.location.href = link;
+    }
 </script>
 
 <div class="nav">
@@ -28,6 +33,9 @@
     <button class="theme-switcher" on:click={switchTheme}>
         <img src="/images/theme_switcher.svg" alt="Theme Switcher" />
     </button>
+    <Divider />
+    <Button on:click={() => link("/")}>Editor</Button>
+    <Button on:click={() => link("/docs")}>Docs</Button>
     <Divider />
     <slot />
 </div>
@@ -48,7 +56,8 @@
         flex-direction: row;
         align-items: center;
 
-        background: rgb(86, 114, 205)
+        background: rgb(86, 114, 205);
+        z-index: 99;
     }
     .logo-margin {
         margin: 0 6px;

@@ -12,17 +12,35 @@
     import OpenButton from "$lib/ControlBar/OpenButton.svelte";
     import FullscreenButton from "$lib/ControlBar/FullscreenButton.svelte";
     import EaglerCraft from "$lib/EaglerCraft/EaglerCraft.svelte";
-    import Documentation from "$lib/Documentation/Documentation.svelte";
 
     // Modals
-    import ExtensionColorsModal from "$lib/MenuModals/ExtensionColors.svelte";
-    import CreateBlockModal from "$lib/MenuModals/CreateBlock.svelte";
+    import LoadExtensionModal from "$lib/MenuModals/LoadExtension.svelte";
 
-    // Modal Scripts
-    import CreateBlockModalScript from "$lib/MenuModals/createblock.js";
+    // Extension Stuff
+    import javascriptGenerator from '../resources/javascriptGenerator';
+    import registerBlock from '../resources/register';
+
+    let EaglerBuilder = {
+        extensions: {},
+        BlockType: {
+            "COMMAND": "command",
+            "REPORTER": "reporter",
+            "BOOLEAN": "boolean",
+            "EVENT": "event",
+        },
+        ArgumentType: {
+            "STRING": "string",
+            "NUMBER": "number",
+            "BOOLEAN": "boolean",
+            "MENU": "menu",
+        }
+    };
+    let Extensions = [];
+
 
     // Toolbox
     import Toolbox from "$lib/Toolbox/Toolbox.xml?raw";
+    let EToolbox = Toolbox;
 
     import JSZip from "jszip";
     import beautify from "js-beautify";
@@ -67,7 +85,6 @@
     import registerConversions from "../resources/blocks/conversions.js";
     import registerVariables from "../resources/blocks/variables.js";
     import registerJSON from "../resources/blocks/json.js";
-    import registerBlocks from "../resources/blocks/blocks.js";
     import registerFunctions from "../resources/blocks/functions.js";
     import registerDebug from "../resources/blocks/debug.js";
     import registerPlayer from "../resources/blocks/player.js";
@@ -88,7 +105,6 @@
     registerConversions();
     registerVariables();
     registerJSON();
-    registerBlocks();
     registerFunctions();
     registerDebug();
     registerPlayer();
@@ -131,7 +147,6 @@
             scaleSpeed: 1.1,
         },
         plugins: {
-            toolbox: ContinuousToolboxPlugin.ContinuousToolbox,
             flyoutsVerticalToolbox: ContinuousToolboxPlugin.ContinuousFlyout,
             metricsManager: ContinuousToolboxPlugin.ContinuousMetrics,
         },
@@ -194,7 +209,8 @@
         lastGeneratedCode = code;
     }
 
-    import pkg from '@blockly/workspace-minimap';
+    
+    import * as pkg from '@blockly/workspace-minimap';
     const { PositionedMinimap } = pkg;
     onMount(() => {
         console.log("ignore the warnings above we dont care about those");
@@ -211,14 +227,186 @@
 
         const minimap = new PositionedMinimap(workspace);
         minimap.init();
+
+        let loadedExtensions = [];
+
+        EaglerBuilder.extensions.register = (extensionClass) => {
+            let info = extensionClass.info();
+            if (loadedExtensions.includes(info.id)) {
+                alert("Extension has already been loaded.");
+                return;
+            } else {
+                loadedExtensions.push(info.id);
+            }
+
+            function FormatBlockText(text, args) {
+                const regex = /\[([^\]]+)\]/g;
+
+                const blocklyText = text.replace(regex, (_, argid) => {
+                    const arg = argid.trim();
+                    if (args.hasOwnProperty(arg)) {
+                        return `%${Object.keys(args).indexOf(arg) + 1}`;
+                    }
+                    return `[${arg}]`;
+                });
+
+                return blocklyText;
+            }
+
+            function FormatMenu(menu) {
+                let dropdownOptions = [];
+                for (const item of menu) {
+                    if (typeof item === 'object' && !Array.isArray(item)) {
+                        dropdownOptions.push([item.text.toString(),item.value.toString()])
+                    } else if (typeof item === "string") {
+                        dropdownOptions.push([item,item])
+                    }
+                }
+                return dropdownOptions;
+            }
+
+            function FormatArgument(id,arg) {
+                switch (arg.type) {
+                    case EaglerBuilder.ArgumentType.STRING:
+                        return [{
+                            "type": "input_value",
+                            "name": id,
+                            "check": "String"
+                        }, `<value name="${id.replace(new RegExp("\"",'g'),"\\\"")}"><block type="literals_string"><field name="STRING">${(arg.default ? arg.default : "")}</field></block></value>`];
+                    case EaglerBuilder.ArgumentType.NUMBER:
+                        return [{
+                            "type": "input_value",
+                            "name": id,
+                            "check": "Number"
+                        }, `<value name="${id.replace(new RegExp("\"",'g'),"\\\"")}"><block type="literals_number"><field name="NUMBER">${(arg.default ? arg.default : 0)}</field></block></value>`];
+                    
+                    case EaglerBuilder.ArgumentType.BOOLEAN:
+                        return [{
+                            "type": "input_value",
+                            "name": id,
+                            "check": "Boolean"
+                        }, ""];
+
+                    case EaglerBuilder.ArgumentType.MENU:
+                        return [{
+                            "type": "field_dropdown",
+                            "name": id,
+                            "options": FormatMenu(info.menus[arg.menu])
+                        }, ""];
+
+                    default:
+                        return [{
+                            "type": "input_dummy"
+                        }, ""];
+                }
+            }
+
+            function makeBlockJson(type,message0,args0) {
+                switch (type) {
+                    case EaglerBuilder.BlockType.COMMAND:
+                        return {
+                            message0,
+                            args0,
+                            previousStatement: null,
+                            nextStatement: null,
+                            inputsInline: true,
+                            colour: info.color ? info.color : "#00ff55"
+                        };
+                    
+                    case EaglerBuilder.BlockType.REPORTER:
+                        return {
+                            message0,
+                            args0,
+                            output: null,
+                            inputsInline: true,
+                            colour: info.color ? info.color : "#00ff55"
+                        };
+                    
+                    case EaglerBuilder.BlockType.BOOLEAN:
+                        return {
+                            message0,
+                            args0,
+                            output: "Boolean",
+                            inputsInline: true,
+                            colour: info.color ? info.color : "#00ff55"
+                        };
+
+                    case EaglerBuilder.BlockType.EVENT:
+                        if (args0.length == 0) {
+                            args0.push({
+                                "type": "input_dummy"
+                            })
+                        }
+                        args0.push({
+                            "type": "input_statement",
+                            "name": "EAGLERBUILDER_EVENT_INNERCODE",
+                        })
+                        message0 += ` ${args0.length - 1 == 1 ? `%${args0.length - 1}` : ""} %${args0.length}`
+                        return {
+                            message0,
+                            args0,
+                            inputsInline: true,
+                            colour: info.color ? info.color : "#00ff55"
+                        };
+
+                    default:
+                        return {};
+                }
+            }
+
+            let xmlblocks = "";
+
+            for (const block of info.blocks) {
+                let xmlinputs = "";
+                let message0 = FormatBlockText(block.text,block.arguments);
+                let args0 = [];
+                for (const argument in block.arguments) {
+                    let arg = FormatArgument(argument,block.arguments[argument],xmlinputs);
+                    args0.push(arg[0])
+                    xmlinputs += arg[1];
+                }
+
+                let blockjson = makeBlockJson(block.type,message0,args0);
+
+                registerBlock(`${info.id}_${block.id}`,blockjson,(blocklyBlock) => {
+                    let args = {};
+                    for (const argument in block.arguments) {
+                        if (block.arguments[argument].type === EaglerBuilder.ArgumentType.MENU) {
+                            args[argument] = blocklyBlock.getFieldValue(argument);
+                        } else if (block.arguments[argument].type === EaglerBuilder.ArgumentType.NUMBER || block.arguments[argument].type === EaglerBuilder.ArgumentType.BOOLEAN || block.arguments[argument].type === EaglerBuilder.ArgumentType.STRING) {
+                            args[argument] = javascriptGenerator.valueToCode(blocklyBlock, argument, javascriptGenerator.ORDER_ATOMIC);
+                        }
+                    }
+                    let code = "";
+                    if (block.type == EaglerBuilder.BlockType.EVENT) {
+                        code = block.func(args,javascriptGenerator.statementToCode(blocklyBlock, 'EAGLERBUILDER_EVENT_INNERCODE'));
+                    } else {
+                        code = block.func(args);
+                    }
+                    console.log
+                    if (block.type == EaglerBuilder.BlockType.COMMAND || block.type == EaglerBuilder.BlockType.EVENT) {
+                        return `${code}\n`;
+                    } else if (block.type == EaglerBuilder.BlockType.REPORTER || block.type == EaglerBuilder.BlockType.BOOLEAN) {
+                        return [`(${code})`, javascriptGenerator.ORDER_ATOMIC];
+                    }
+                })
+
+                xmlblocks += `  <block type="${info.id}_${block.id}">${xmlinputs}</block>\n`;
+            }
+            let extension = `<category name="${info.name ? info.name : info.id}" colour="${info.color ? info.color : "#00ff55"}">
+${xmlblocks}</category>`;
+            EToolbox = EToolbox.replace('</xml>', extension + '</xml>');
+            console.log(extension)
+            workspace.updateToolbox(EToolbox);
+        }
     });
 
     function downloadProject() {
         // generate file name
         let filteredProjectName = (projectName || projectID).replace(/[^a-z0-9\-]+/gim, "_");
-        let fileName = filteredProjectName + ".tb";
+        let fileName = filteredProjectName + ".eb";
         if (!filteredProjectName) {
-            fileName = "MyProject.tb";
+            fileName = "MyProject.eb";
         }
 
         // data
@@ -227,8 +415,7 @@
         // modify data by me wow
         projectData = {
             blockly: projectData,
-            metadata: extensionMetadata,
-            images: extensionImageStates
+            extensions: Extensions
         }
 
         // zip
@@ -249,11 +436,11 @@
         });
     }
     function loadProject() {
-        fileDialog({ accept: ".tb" }).then((files) => {
+        fileDialog({ accept: ".eb" }).then((files) => {
             if (!files) return;
             const file = files[0];
 
-            const projectNameIdx = file.name.lastIndexOf(".tb");
+            const projectNameIdx = file.name.lastIndexOf(".efb");
 
             JSZip.loadAsync(file.arrayBuffer()).then(async (zip) => {
                 console.log("loaded zip file...");
@@ -265,16 +452,9 @@
                     .async("string");
                 const projectJson = JSON.parse(projectJsonString);
 
-                // do your thing
-                projectName = projectJson.metadata.name
-                projectID = projectJson.metadata.id
-                for (var i in projectJson.metadata) {
-                    var v = projectJson.metadata[i]
-                    extensionMetadata[i] = v
-                }
-                for (var i in projectJson.images) {
-                    var v = projectJson.images[i]
-                    extensionImageStates[i] = v
+                // Load Extension stuff i guess
+                for (const extension of projectJson.extensions) {
+                    eval(extension);
                 }
 
                 // get project workspace xml stuffs
@@ -371,7 +551,8 @@
 
     // Modals
     const ModalState = {
-        extensionColors: false,
+        loadExtension: false,
+        extensionGallery: false,
     };
 
     function discordInvite() {
@@ -475,66 +656,130 @@
     }
 </script>
 
-<CreateBlockModal
-    color1={extensionMetadata.color1}
-    color2={extensionMetadata.color2}
-    color3={extensionMetadata.color3}
-/>
-{#if ModalState.extensionColors}
-    <ExtensionColorsModal
-        color1={extensionMetadata.color1}
-        color2={extensionMetadata.color2}
-        color3={extensionMetadata.color3}
-        tbShow={extensionMetadata.tbShow}
-        on:completed={(colors) => {
-            ModalState.extensionColors = false;
-            extensionMetadata.color1 = colors.detail.color1;
-            extensionMetadata.color2 = colors.detail.color2;
-            extensionMetadata.color3 = colors.detail.color3;
-            extensionMetadata.tbShow = colors.detail.tbShow;
-            updateGeneratedCode();
+{#if ModalState.loadExtension}
+    <LoadExtensionModal
+        on:completed={async (data) => {
+            ModalState.loadExtension = false;
+            if (data.detail.selected == "URL") {
+                Extensions.push(await (await fetch(data.detail.URL)).text());
+                eval(await (await fetch(data.detail.URL)).text());
+            } else if (data.detail.selected == "Files") {
+                const fileReader = new FileReader();
+                fileReader.onload = () => {
+                    Extensions.push(fileReader.result);
+                    eval(fileReader.result);
+                };
+                fileReader.readAsText(data.detail.File);
+            } else if (data.detail.selected == "Text") {
+                Extensions.push(data.detail.Text);
+                eval(data.detail.Text);
+            }
         }}
         on:cancel={() => {
-            ModalState.extensionColors = false;
-            updateGeneratedCode();
+            ModalState.loadExtension = false;
         }}
     />
+{/if}
+{#if ModalState.extensionGallery}
+<div class="full-modal">
+    <div class="nav">
+        <button class="back-button" on:click={() => {
+            ModalState.extensionGallery = false;
+        }}>
+            <span class="back-span">
+                <img
+                    class="arrow"
+                    draggable="false"
+                    src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB3aWR0aD0iMjBweCIgaGVpZ2h0PSIyMHB4IiB2aWV3Qm94PSIwIDAgMjAgMjAiIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayI+CiAgICA8IS0tIEdlbmVyYXRvcjogU2tldGNoIDQ4LjIgKDQ3MzI3KSAtIGh0dHA6Ly93d3cuYm9oZW1pYW5jb2RpbmcuY29tL3NrZXRjaCAtLT4KICAgIDx0aXRsZT5iYWNrLWljb248L3RpdGxlPgogICAgPGRlc2M+Q3JlYXRlZCB3aXRoIFNrZXRjaC48L2Rlc2M+CiAgICA8ZGVmcz48L2RlZnM+CiAgICA8ZyBpZD0iUGFnZS0xIiBzdHJva2U9Im5vbmUiIHN0cm9rZS13aWR0aD0iMSIgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIj4KICAgICAgICA8ZyBpZD0iYmFjay1pY29uIiBmaWxsPSIjRkZGRkZGIj4KICAgICAgICAgICAgPHBhdGggZD0iTTQuMTA4MDQ5MTIsOC41Nzc2NTA1NSBMOS4zMzIwMzYzOCwzLjM1MzY2MzI5IEM5LjYzODIwNDEzLDMuMDQ1NTgxOTkgMTAuMTE2NTkxMiwzLjA0NTU4MTk5IDEwLjQyMjc1OSwzLjM1MzY2MzI5IEwxNS42NDY3NDYyLDguNTc3NjUwNTUgQzE2LjE0NDI2ODgsOS4wNzUxNzMxNCAxNS43ODA2OTQ2LDkuODk2MDg1NDMgMTUuMDkxODE3Miw5Ljg5NjA4NTQzIEwxMi40ODkzOTEzLDkuODk2MDg1NDMgTDEwLjkzOTQxNzEsMTYuMDM4NTc1OSBDMTAuNzg2MzMzMiwxNi42MzM2ODk1IDEwLjE3Mzk5NzcsMTYuOTk1MzUwMiA5LjU4MDc5NzY4LDE2Ljg0MjI2NjMgQzkuMTU5ODE3MDIsMTYuNzQ4NTAyNCA4Ljg1MzY0OTI3LDE2LjQyMzE5OTIgOC43NTc5NzE4NCwxNi4wMzg1NzU5IEw3LjIwNzk5NzYsOS44OTYwODU0MyBMNC42NjI5NzgxNyw5Ljg5NjA4NTQzIEMzLjk3NDEwMDczLDkuODk2MDg1NDMgMy42MTA1MjY1Myw5LjA3NTE3MzE0IDQuMTA4MDQ5MTIsOC41Nzc2NTA1NSIgaWQ9IkZpbGwtMSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoOS44NzczOTgsIDEwLjAwMDAwMCkgcm90YXRlKC05MC4wMDAwMDApIHRyYW5zbGF0ZSgtOS44NzczOTgsIC0xMC4wMDAwMDApICI+PC9wYXRoPgogICAgICAgIDwvZz4KICAgIDwvZz4KPC9zdmc+"
+                >
+                Back
+            </span>
+        </button>
+        <span class="full-modal-title">Choose an Extension</span>
+    </div>
+    <div class="main">
+        <div class="library">
+            <div class="extension" on:click={() => {
+                ModalState.extensionGallery = false;
+                ModalState.loadExtension = true;
+            }}>
+                <img class="extension-img" draggable="false" src="/images/extensions/custom_extension.svg">
+                <div class="extension-about">
+                    <span class="extension-title">
+                        Custom Extension
+                    </span>
+                    <br>
+                    <span class="extension-description">
+                        Load custom extensions from URLs, files, or JavaScript source code.
+                    </span>
+                </div>
+            </div>
+            <div class="extension" on:click={async () => {
+                Extensions.push(await (await fetch("/extensions/text-edit.js")).text());
+                eval(await (await fetch("/extensions/text-edit.js")).text());
+                ModalState.extensionGallery = false;
+            }}>
+                <img class="extension-img" draggable="false" src="/images/extensions/text_edit.png">
+                <div class="extension-about">
+                    <span class="extension-title">
+                        Text Edit
+                    </span>
+                    <br>
+                    <span class="extension-description">
+                        Transform Text into other text.
+                    </span>
+                </div>
+            </div>
+            <div class="extension" on:click={async () => {
+                Extensions.push(await (await fetch("/extensions/operators-expansion.js")).text());
+                eval(await (await fetch("/extensions/operators-expansion.js")).text());
+                ModalState.extensionGallery = false;
+            }}>
+                <img class="extension-img" draggable="false" src="/images/extensions/operators_expansion.png">
+                <div class="extension-about">
+                    <span class="extension-title">
+                        Operators Expansion
+                    </span>
+                    <br>
+                    <span class="extension-description">
+                        More operators like nand, xor, etc.
+                    </span>
+                </div>
+            </div>
+            <div class="extension" on:click={async () => {
+                Extensions.push(await (await fetch("/extensions/game-settings.js")).text());
+                eval(await (await fetch("/extensions/game-settings.js")).text());
+                ModalState.extensionGallery = false;
+            }}>
+                <img class="extension-img" draggable="false" src="/images/extensions/game_settings.svg">
+                <div class="extension-about">
+                    <span class="extension-title">
+                        Game Settings
+                    </span>
+                    <br>
+                    <span class="extension-description">
+                        Manage in-game Settings.
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {/if}
 <NavigationBar>
     <NavigationButton on:click={discordInvite}>Discord</NavigationButton>
     <NavigationButton on:click={github}>Github</NavigationButton>
     <NavigationDivider />
     <NavigationButton on:click={downloadProject}>Save</NavigationButton>
-    <NavigationButton on:click={loadProject}>Load</NavigationButton><!--
-    <NavigationDivider />
-    <input
-        class="project-name"
-        type="text"
-        placeholder="Extension ID (ex: extensionID)"
-        style="margin-left:4px;margin-right:4px"
-        data-invalid={isExtensionIDInvalid(projectID)}
-        bind:value={projectID}
-        on:change={updateGeneratedCode}
-    />
-    {#if isExtensionIDInvalid(projectID)}
-        <p style="color:white;margin-left:4px">
-            <b>Extension ID must be only letters and numbers.</b>
-        </p>
-    {/if}
-    <NavigationDivider />
-    <input
-        class="project-name"
-        type="text"
-        placeholder="Extension Name (ex: Extension)"
-        style="margin-left:4px;margin-right:4px"
-        bind:value={projectName}
-        on:change={updateGeneratedCode}
-    />-->
+    <NavigationButton on:click={loadProject}>Load</NavigationButton>
 </NavigationBar>
 <div class="main">
     <div class="row-menus">
         <div class="row-first-submenus">
             <div class="blockMenuButtons">
+                <StyledButton on:click={() => {
+                    ModalState.extensionGallery = true;
+                }}>Load Extension</StyledButton>
             </div>
             <div class="blocklyWrapper">
                 <BlocklyComponent {config} locale={en} bind:workspace />
@@ -557,7 +802,6 @@
                 <EaglerCraft>
                 </EaglerCraft>
             </div>
-            <Documentation/>
             <div class="row-subsubmenus">
                 <div class="codeActionsWrapper">
                     <p style="margin-right: 12px"><b>Mod Code</b></p>
@@ -642,6 +886,47 @@
         border: 1px solid dodgerblue;
     }
 
+    .full-modal {
+        background: white;
+        width: 100%;
+        height: 100vh;
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 100;
+    }
+
+    :global(body.dark) .full-modal {
+        background: #111;
+    }
+
+    .full-modal-title {
+        width: 100%;
+        text-align: center;
+        position: absolute;
+        left: 0;
+        color: white;
+        z-index: -1;
+    }
+
+    .arrow {
+        height: 1.5rem;
+    }
+
+    .back-span {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        font-size: 1rem;
+    }
+
+    .back-button {
+        background: transparent;
+        color: white;
+        border: none;
+        cursor: pointer;
+    }
+
     .main {
         position: absolute;
         left: 0px;
@@ -650,6 +935,88 @@
         height: calc(100% - var(--nav-height));
 
         min-width: 870px;
+    }
+
+    .nav {
+        position: fixed;
+        left: 0px;
+        top: 0px;
+        width: 100%;
+        height: var(--nav-height);
+
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+
+        background: rgb(86, 114, 205);
+    }
+
+    :global(body.dark) .nav {
+        background: #333;
+    }
+
+    .library {
+        display: flex;
+        justify-content: flex-start;
+        align-content: flex-start;
+        align-items: flex-start;
+        flex-grow: 1;
+        flex-wrap: wrap;
+        overflow-y: auto;
+        padding: 0.5rem;
+    }
+
+    .extension {
+        display: flex;
+        flex-direction: column;
+        border-radius: 0.5rem;
+        width: 300px;
+        overflow: hidden;
+        border: 1px #bbbbbb solid;
+        cursor: pointer;
+        margin: 0.5rem;
+        height: auto;
+        overflow: hidden;
+        align-self: stretch;
+        flex-basis: 300px;
+    }
+
+    :global(body.dark) .extension {
+        border-color: #3b3b3b;
+    }
+
+    .extension:hover, :global(body.dark) .extension:hover {
+        border: 2px rgb(86, 114, 205) solid;
+    }
+
+    .extension-img {
+        width: 100%;
+        height: 11.5rem;
+        object-fit: cover;
+    }
+
+    .extension-about {
+        text-align: left;
+        padding: 10px;
+        padding-left: 1.25rem;
+        font-weight: bold;
+    }
+
+    .extension-title {
+        margin: 0.25rem 0;
+        text-align: center;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+
+    .extension-description {
+        display: block;
+        font-weight: normal;
+        line-height: 1.375rem;
+        padding-top: .3125rem;
+        padding-bottom: .25rem;
     }
 
     .project-name {

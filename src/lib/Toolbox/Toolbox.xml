@@ -53,10 +53,6 @@
         <block type="sound_startsound" />
     </category>
     <category name="Sensing" colour="#5CB1D6">
-        <!--
-        <block type="sensing_keypress" />
-        <sep gap="48"></sep>
-        -->
         <block type="sensing_alert" />
         <block type="sensing_prompt" />
         <block type="sensing_confirm" />
@@ -104,7 +100,6 @@
         <sep gap="48"></sep>
         <block type="operators_join" />
         <block type="operators_letter" />
-        <!--<block type="operators_addblock" />-->
     </category>
     <category name="Conversions" colour="#8BC059">
         <block type="conversions_tonumber" />
@@ -139,13 +134,6 @@
         <block type="json_objectvalues" />
     </category>
     <sep></sep>
-    <!--<category name="Blocks" colour="#FF6680">
-        <block type="blocks_create" />
-        <block type="blocks_input" />
-        <sep gap="48"></sep>
-        <block type="blocks_get" />
-        <block type="blocks_return" />
-    </category>-->
     <category name="Functions" colour="#5531D6">
         <block type="functions_create">
             <statement name="FUNC">
@@ -237,4 +225,5 @@
         <sep gap="48"></sep>
         <block type="interface_currentscreen"/>
     </category>
+    <sep></sep>
 </xml>
