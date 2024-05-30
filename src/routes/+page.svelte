@@ -95,7 +95,7 @@
     registerDisplay();
     registerinterface();
 
-    const EaglerCraftVersion = "1.3";
+    const EaglerCraftVersion = "1.3.2";
 
     const en = {
         rtl: false,
@@ -857,5 +857,11 @@
 
     :global(.blocklyScrollbarBackground:hover + .blocklyScrollbarHandle, .blocklyScrollbarHandle:hover) {
         fill: #575E75; /* fix strange scrollbar issue */
+    }
+
+    :global(.blocklyToolboxDiv) {
+        overflow-x: hidden;
+        scrollbar-color: #797e8e80 transparent;
+        scrollbar-width: thin;
     }
 </style>

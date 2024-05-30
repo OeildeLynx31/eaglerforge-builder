@@ -119,19 +119,17 @@ function register() {
         BOOLEAN = BOOLEAN ? `${Boolean(BOOLEAN)}` : 'false'
         let code;
         if (PROPERTY === "isdead") {
-            code = (BOOLEAN==="true"?`ModAPI.player.setDead()`:'');
+            code = `ModAPI.player.isDead = ${BOOLEAN}`;
         } else if (PROPERTY === "isinvisible") {
             code = `ModAPI.player.setInvisible({invisible: ${BOOLEAN}})`
         } else if (PROPERTY === "isinweb") {
-            code = `ModAPI.player.setInWeb(${BOOLEAN})`
+            code = `ModAPI.player.isInWeb = ${BOOLEAN}`
         } else if (PROPERTY === "issprinting") {
             code = `ModAPI.player.setSprinting({flag: ${BOOLEAN}})`
         } else if (PROPERTY === "issneaking") {
             code = `ModAPI.player.setSneaking({sneaking: ${BOOLEAN}})`
         } else if (PROPERTY === "issilent") {
             code = `ModAPI.player.setSilent({isSilent: ${BOOLEAN}})`
-        } else if (PROPERTY === "canedit") {
-            code = `ModAPI.player.allowEdit(${BOOLEAN})`
         }
         return code;
     })
@@ -177,8 +175,6 @@ function register() {
             code = `ModAPI.player.isAllowEdit()`
         } else if (PROPERTY === "onground") {
             code = `ModAPI.player.onGround`
-        } else if (PROPERTY === "isdead") {
-            code = `ModAPI.player.isDead`
         } else if (PROPERTY === "ismoving") {
             code = `ModAPI.player.isMoving()`
         }
